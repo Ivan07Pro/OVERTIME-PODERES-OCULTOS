@@ -1,0 +1,53 @@
+# ---- Unity: carpetas que Unity genera solo ----
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Escenas de recuperación automática de Unity
+/[Aa]ssets/_Recovery/
+/[Aa]ssets/_Recovery.meta
+
+# ---- Archivos de Visual Studio / VS Code / Rider ----
+.vs/
+.vscode/
+.idea/
+*.csproj
+*.unityproj
+*.sln
+*.slnx
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# ---- Copias de seguridad de Blender ----
+*.blend1
+*.blend1.meta
+*.blend2
+*.blend2.meta
+
+# ---- Builds y crash reports ----
+*.apk
+*.aab
+*.unitypackage
+*.app
+sysinfo.txt
+crashlytics-build.properties
+
+# ---- macOS ----
+.DS_Store
