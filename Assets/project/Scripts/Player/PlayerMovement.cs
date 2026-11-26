@@ -6,16 +6,27 @@ public class PlayerMovement : MonoBehaviour
     [Header("Movimiento")]
     public float walkSpeed = 4f;
     public float sprintSpeed = 7f;
+    [Tooltip("Estamina por segundo que gasta correr (si hay PlayerStats).")]
+    public float sprintStaminaCost = 20f;
 
-    [Header("Referencias")]
-    public Transform cameraTransform;
-    public Animator animator;
-
-    private CharacterController controller;
-    private float verticalVelocity;
-
+    [Header("Salto y gravedad")]
     public float gravity = -20f;
     public float jumpHeight = 2f;
+
+    [Header("Referencias (se buscan solas si están vacías)")]
+    public Transform cameraTransform;
+    public Animator animator;
+    public PlayerInputHandler input;
+    public GroundChecker groundChecker;
+    public PlayerStats stats;
+
+    CharacterController controller;
+    float verticalVelocity;
+
+    static readonly int SpeedHash = Animator.StringToHash("Speed");
+    static readonly int IsGroundedHash = Animator.StringToHash("IsGrounded");
+    static readonly int VerticalVelocityHash = Animator.StringToHash("VerticalVelocity");
+    static readonly int JumpHash = Animator.StringToHash("Jump");
 
     void Awake()
     {
@@ -26,61 +37,72 @@ public class PlayerMovement : MonoBehaviour
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
+
+        if (input == null)
+            input = PlayerInputHandler.FindFor(this);
+
+        if (groundChecker == null)
+            groundChecker = GetComponentInChildren<GroundChecker>();
+
+        if (stats == null)
+            stats = GetComponentInParent<PlayerStats>();
     }
 
     void Update()
     {
+        if (cameraTransform == null)
+        {
+            // Puede que la cámara aparezca después (por ejemplo al cargar escena).
+            if (Camera.main == null) return;
+            cameraTransform = Camera.main.transform;
+        }
+
         Move();
     }
 
     void Move()
     {
-        float horizontal = Input.GetAxisRaw("Horizontal");
-        float vertical = Input.GetAxisRaw("Vertical");
+        Vector2 moveInput = input.Move;
 
-        Vector3 camForward = cameraTransform.forward;
-        Vector3 camRight = cameraTransform.right;
+        // Dirección relativa a la cámara, sin componente vertical.
+        Vector3 camForward = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
+        Vector3 camRight = Vector3.ProjectOnPlane(cameraTransform.right, Vector3.up).normalized;
+        Vector3 move = camForward * moveInput.y + camRight * moveInput.x;
+        move = Vector3.ClampMagnitude(move, 1f);
 
-        camForward.y = 0f;
-        camRight.y = 0f;
+        // Correr solo si nos movemos y (si hay stats) queda estamina.
+        bool sprinting = input.SprintHeld && move.sqrMagnitude > 0.01f;
+        if (sprinting && stats != null)
+            sprinting = stats.UseStamina(sprintStaminaCost * Time.deltaTime);
 
-        camForward.Normalize();
-        camRight.Normalize();
+        float speed = sprinting ? sprintSpeed : walkSpeed;
 
-        Vector3 move = camForward * vertical + camRight * horizontal;
+        bool grounded = controller.isGrounded
+                        || (groundChecker != null && groundChecker.IsGrounded && verticalVelocity <= 0f);
 
-        bool sprint = Input.GetKey(KeyCode.LeftShift);
-        float speed = sprint ? sprintSpeed : walkSpeed;
+        if (grounded && verticalVelocity < 0f)
+            verticalVelocity = -2f; // mantiene al jugador pegado al suelo
 
-        if (controller.isGrounded)
+        if (grounded && input.JumpPressed)
         {
-            verticalVelocity = -2f;
-
-            if (Input.GetButtonDown("Jump"))
-            {
-                verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
-            }
+            verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
+            if (animator != null) animator.SetTrigger(JumpHash);
         }
 
         verticalVelocity += gravity * Time.deltaTime;
 
-        Vector3 finalMove = move.normalized * speed;
+        Vector3 finalMove = move * speed;
         finalMove.y = verticalVelocity;
-
         controller.Move(finalMove * Time.deltaTime);
 
         // -------- ANIMACIONES --------
-
-        float animationSpeed = move.magnitude;
-
+        // Speed: 0 = quieto, 1 = caminando, ~1.75 = corriendo (sprintSpeed / walkSpeed).
         if (animator != null)
         {
-            animator.SetFloat("Speed", animationSpeed);
-            animator.SetBool("IsGrounded", controller.isGrounded);
-            animator.SetFloat("VerticalVelocity", verticalVelocity);
+            float animationSpeed = move.magnitude * (speed / walkSpeed);
+            animator.SetFloat(SpeedHash, animationSpeed, 0.1f, Time.deltaTime);
+            animator.SetBool(IsGroundedHash, grounded);
+            animator.SetFloat(VerticalVelocityHash, verticalVelocity);
         }
-
-        // Descomenta esta línea si quieres comprobar el valor
-        // Debug.Log("Speed = " + animationSpeed);
     }
 }
